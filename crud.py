@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 import models
 import schemas
+from fastapi import HTTPException, status
 
 def get_mutual_fund(db: Session, mutual_fund_id: int):
     return db.query(models.MutualFund).filter(models.MutualFund.id == mutual_fund_id).first()
@@ -8,12 +9,26 @@ def get_mutual_fund(db: Session, mutual_fund_id: int):
 def get_mutual_funds(db: Session, skip: int = 0, limit: int = 100):
     return db.query(models.MutualFund).offset(skip).limit(limit).all()
 
+
+
 def create_mutual_fund(db: Session, mutual_fund: schemas.MutualFundCreate):
+    # Check if a mutual fund with the same ISIN already exists
+    existing_mutual_fund = db.query(models.MutualFund).filter(models.MutualFund.isin == mutual_fund.isin).first()
+    if existing_mutual_fund:
+        # Raise an HTTPException with a 400 Bad Request status code
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Mutual fund with ISIN '{mutual_fund.isin}' already exists."
+        )
+    
+    # If no duplicate ISIN, create the new mutual fund
     db_mutual_fund = models.MutualFund(**mutual_fund.dict())
     db.add(db_mutual_fund)
     db.commit()
     db.refresh(db_mutual_fund)
     return db_mutual_fund
+
+
 
 def get_sector_allocations(db: Session, mutual_fund_id: int):
     return db.query(models.SectorAllocation).filter(models.SectorAllocation.mutual_fund_id == mutual_fund_id).all()
